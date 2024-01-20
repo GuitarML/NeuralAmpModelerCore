@@ -121,14 +121,14 @@ void nam::wavenet::_LayerArray::set_num_frames_(const long num_frames)
 {
   // Wavenet checks for unchanged num_frames; if we made it here, there's
   // something to do.
-  if (LAYER_ARRAY_BUFFER_SIZE - num_frames < this->_get_receptive_field())
-  {
-    std::stringstream ss;
-    ss << "Asked to accept a buffer of " << num_frames << " samples, but the buffer is too short ("
-       << LAYER_ARRAY_BUFFER_SIZE << ") to get out of the recptive field (" << this->_get_receptive_field()
-       << "); copy errors could occur!\n";
-    throw std::runtime_error(ss.str().c_str());
-  }
+  //if (LAYER_ARRAY_BUFFER_SIZE - num_frames < this->_get_receptive_field())
+  //{
+    //std::stringstream ss;
+    //ss << "Asked to accept a buffer of " << num_frames << " samples, but the buffer is too short ("
+    //   << LAYER_ARRAY_BUFFER_SIZE << ") to get out of the recptive field (" << this->_get_receptive_field()
+    //   << "); copy errors could occur!\n";
+    //throw std::runtime_error(ss.str().c_str());
+  //}
   for (size_t i = 0; i < this->_layers.size(); i++)
     this->_layers[i].set_num_frames_(num_frames);
 }
@@ -230,15 +230,29 @@ void nam::wavenet::_Head::_apply_activation_(Eigen::MatrixXf& x)
 
 // WaveNet ====================================================================
 
-nam::wavenet::WaveNet::WaveNet(const std::vector<nam::wavenet::LayerArrayParams>& layer_array_params,
-                               const float head_scale, const bool with_head, std::vector<float> weights,
-                               const double expected_sample_rate)
-: DSP(expected_sample_rate)
+nam::wavenet::WaveNet::WaveNet() : DSP(48000.0)
 , _num_frames(0)
-, _head_scale(head_scale)
+//, _head_scale(head_scale)
 {
-  if (with_head)
-    throw std::runtime_error("Head not implemented!");
+
+}
+
+// Destructor
+nam::wavenet::WaveNet::~WaveNet()
+{
+    // No Code Needed
+}
+
+
+void nam::wavenet::WaveNet::Init(const std::vector<nam::wavenet::LayerArrayParams>& layer_array_params,
+                               const float head_scale, const bool with_head, std::vector<float> weights,
+                               const float expected_sample_rate)
+//: DSP(expected_sample_rate)
+//, _num_frames(0)
+//, _head_scale(head_scale)
+{
+  //if (with_head)
+  //  throw std::runtime_error("Head not implemented!");
   for (size_t i = 0; i < layer_array_params.size(); i++)
   {
     this->_layer_arrays.push_back(nam::wavenet::_LayerArray(
@@ -248,14 +262,14 @@ nam::wavenet::WaveNet::WaveNet(const std::vector<nam::wavenet::LayerArrayParams>
     this->_layer_array_outputs.push_back(Eigen::MatrixXf(layer_array_params[i].channels, 0));
     if (i == 0)
       this->_head_arrays.push_back(Eigen::MatrixXf(layer_array_params[i].channels, 0));
-    if (i > 0)
-      if (layer_array_params[i].channels != layer_array_params[i - 1].head_size)
-      {
-        std::stringstream ss;
-        ss << "channels of layer " << i << " (" << layer_array_params[i].channels
-           << ") doesn't match head_size of preceding layer (" << layer_array_params[i - 1].head_size << "!\n";
-        throw std::runtime_error(ss.str().c_str());
-      }
+    //if (i > 0)
+    //  if (layer_array_params[i].channels != layer_array_params[i - 1].head_size)
+    //  {
+    //    std::stringstream ss;
+    //    ss << "channels of layer " << i << " (" << layer_array_params[i].channels
+    //       << ") doesn't match head_size of preceding layer (" << layer_array_params[i - 1].head_size << "!\n";
+    //    throw std::runtime_error(ss.str().c_str());
+    //  }
     this->_head_arrays.push_back(Eigen::MatrixXf(layer_array_params[i].head_size, 0));
   }
   this->_head_output.resize(1, 0); // Mono output!
@@ -265,6 +279,7 @@ nam::wavenet::WaveNet::WaveNet(const std::vector<nam::wavenet::LayerArrayParams>
   for (size_t i = 0; i < this->_layer_arrays.size(); i++)
     _prewarm_samples += this->_layer_arrays[i].get_receptive_field();
 }
+
 
 void nam::wavenet::WaveNet::finalize_(const int num_frames)
 {
@@ -279,18 +294,18 @@ void nam::wavenet::WaveNet::set_weights_(std::vector<float>& weights)
     this->_layer_arrays[i].set_weights_(it);
   // this->_head.set_params_(it);
   this->_head_scale = *(it++);
-  if (it != weights.end())
-  {
-    std::stringstream ss;
-    for (size_t i = 0; i < weights.size(); i++)
-      if (weights[i] == *it)
-      {
-        ss << "Weight mismatch: assigned " << i + 1 << " weights, but " << weights.size() << " were provided.";
-        throw std::runtime_error(ss.str().c_str());
-      }
-    ss << "Weight mismatch: provided " << weights.size() << " weights, but the model expects more.";
-    throw std::runtime_error(ss.str().c_str());
-  }
+  //if (it != weights.end())
+  //{
+  //  std::stringstream ss;
+  //  for (size_t i = 0; i < weights.size(); i++)
+  //    if (weights[i] == *it)
+  //    {
+  //     ss << "Weight mismatch: assigned " << i + 1 << " weights, but " << weights.size() << " were provided.";
+  //      throw std::runtime_error(ss.str().c_str());
+  //    }
+  //  ss << "Weight mismatch: provided " << weights.size() << " weights, but the model expects more.";
+  //  throw std::runtime_error(ss.str().c_str());
+  //}
 }
 
 void nam::wavenet::WaveNet::_advance_buffers_(const int num_frames)
@@ -305,15 +320,18 @@ void nam::wavenet::WaveNet::_prepare_for_frames_(const long num_frames)
     this->_layer_arrays[i].prepare_for_frames_(num_frames);
 }
 
-void nam::wavenet::WaveNet::_set_condition_array(NAM_SAMPLE* input, const int num_frames)
+//void nam::wavenet::WaveNet::_set_condition_array(float* input, const int num_frames)
+void nam::wavenet::WaveNet::_set_condition_array(float input, const int num_frames)
 {
-  for (int j = 0; j < num_frames; j++)
-  {
-    this->_condition(0, j) = input[j];
-  }
+  // Assuming 1 frame
+  this->_condition(0, 0) = input;
+  //for (int j = 0; j < num_frames; j++)
+  //{
+  //  this->_condition(0, j) = input[j];
+  //}
 }
 
-void nam::wavenet::WaveNet::process(NAM_SAMPLE* input, NAM_SAMPLE* output, const int num_frames)
+float nam::wavenet::WaveNet::process(float input, const int num_frames)
 {
   this->_set_num_frames_(num_frames);
   this->_prepare_for_frames_(num_frames);
@@ -336,11 +354,13 @@ void nam::wavenet::WaveNet::process(NAM_SAMPLE* input, NAM_SAMPLE* output, const
 
   const long final_head_array = this->_head_arrays.size() - 1;
   assert(this->_head_arrays[final_head_array].rows() == 1);
+  float out = 0.0;
   for (int s = 0; s < num_frames; s++)
   {
-    float out = this->_head_scale * this->_head_arrays[final_head_array](0, s);
-    output[s] = out;
+    out = this->_head_scale * this->_head_arrays[final_head_array](0, s);
+    //output[s] = out;
   }
+  return out;
 }
 
 void nam::wavenet::WaveNet::_set_num_frames_(const long num_frames)

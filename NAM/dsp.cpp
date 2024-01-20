@@ -1,7 +1,7 @@
 #include <algorithm> // std::max_element
 #include <algorithm>
 #include <cmath> // pow, tanh, expf
-#include <filesystem>
+//#include <filesystem>
 #include <fstream>
 #include <string>
 #include <unordered_map>
@@ -14,45 +14,58 @@
 
 constexpr const long _INPUT_BUFFER_SAFETY_FACTOR = 32;
 
-nam::DSP::DSP(const double expected_sample_rate)
+nam::DSP::DSP(const float expected_sample_rate)
 : mExpectedSampleRate(expected_sample_rate)
 {
 }
+
+// Destructor
+nam::DSP::~DSP()
+{
+    // No Code Needed
+}
+
 
 void nam::DSP::prewarm()
 {
   if (_prewarm_samples == 0)
     return;
 
-  NAM_SAMPLE sample = 0;
-  NAM_SAMPLE* sample_ptr = &sample;
+  float sample = 0;
+  //float* sample_ptr = &sample;
+  float sample_ptr = 0.0;
 
   // pre-warm the model for a model-specific number of samples
   for (long i = 0; i < _prewarm_samples; i++)
   {
-    this->process(sample_ptr, sample_ptr, 1);
+    //this->process(sample_ptr, sample_ptr, 1);
+    this->process(sample_ptr, 1);
     this->finalize_(1);
     sample = 0;
   }
 }
 
-void nam::DSP::process(NAM_SAMPLE* input, NAM_SAMPLE* output, const int num_frames)
+//void nam::DSP::process(float* input, float* output, const int num_frames)
+float nam::DSP::process(float input, const int num_frames)
 {
+  float out = input;
+  return out;
   // Default implementation is the null operation
-  for (size_t i = 0; i < num_frames; i++)
-    output[i] = input[i];
+  //for (size_t i = 0; i < num_frames; i++)
+  //  output[i] = input[i];
 }
 
-double nam::DSP::GetLoudness() const
+float nam::DSP::GetLoudness() const
 {
   if (!HasLoudness())
   {
-    throw std::runtime_error("Asked for loudness of a model that doesn't know how loud it is!");
+    //throw std::runtime_error("Asked for loudness of a model that doesn't know how loud it is!");
+    return 0.0;
   }
   return mLoudness;
 }
 
-void nam::DSP::SetLoudness(const double loudness)
+void nam::DSP::SetLoudness(const float loudness)
 {
   mLoudness = loudness;
   mHasLoudness = true;
@@ -62,7 +75,7 @@ void nam::DSP::finalize_(const int num_frames) {}
 
 // Buffer =====================================================================
 
-nam::Buffer::Buffer(const int receptive_field, const double expected_sample_rate)
+nam::Buffer::Buffer(const int receptive_field, const float expected_sample_rate)
 : nam::DSP(expected_sample_rate)
 {
   this->_set_receptive_field(receptive_field);
@@ -81,7 +94,8 @@ void nam::Buffer::_set_receptive_field(const int new_receptive_field, const int 
   this->_reset_input_buffer();
 }
 
-void nam::Buffer::_update_buffers_(NAM_SAMPLE* input, const int num_frames)
+//void nam::Buffer::_update_buffers_(float* input, const int num_frames)
+void nam::Buffer::_update_buffers_(float input, const int num_frames)
 {
   // Make sure that the buffer is big enough for the receptive field and the
   // frames needed!
@@ -102,8 +116,13 @@ void nam::Buffer::_update_buffers_(NAM_SAMPLE* input, const int num_frames)
   if (this->_input_buffer_offset + num_frames > (long)this->_input_buffer.size())
     this->_rewind_buffers_();
   // Put the new samples into the input buffer
-  for (long i = this->_input_buffer_offset, j = 0; j < num_frames; i++, j++)
-    this->_input_buffer[i] = input[j];
+
+  // Assuming 1 frame KAB
+  for (long i = this->_input_buffer_offset, j = 0; j < num_frames; i++, j++) {
+    //this->_input_buffer[i] = input[j];
+    this->_input_buffer[i] = input;
+  }
+
   // And resize the output buffer:
   this->_output_buffer.resize(num_frames);
   std::fill(this->_output_buffer.begin(), this->_output_buffer.end(), 0.0f);
@@ -137,13 +156,13 @@ void nam::Buffer::finalize_(const int num_frames)
 // Linear =====================================================================
 
 nam::Linear::Linear(const int receptive_field, const bool _bias, const std::vector<float>& weights,
-                    const double expected_sample_rate)
+                    const float expected_sample_rate)
 : nam::Buffer(receptive_field, expected_sample_rate)
 {
-  if ((int)weights.size() != (receptive_field + (_bias ? 1 : 0)))
-    throw std::runtime_error(
-      "Params vector does not match expected size based "
-      "on architecture parameters");
+  //if ((int)weights.size() != (receptive_field + (_bias ? 1 : 0)))
+  //  throw std::runtime_error(
+  //    "Params vector does not match expected size based "
+  //    "on architecture parameters");
 
   this->_weight.resize(this->_receptive_field);
   // Pass in in reverse order so that dot products work out of the box.
@@ -152,7 +171,8 @@ nam::Linear::Linear(const int receptive_field, const bool _bias, const std::vect
   this->_bias = _bias ? weights[receptive_field] : (float)0.0;
 }
 
-void nam::Linear::process(NAM_SAMPLE* input, NAM_SAMPLE* output, const int num_frames)
+//void nam::Linear::process(float* input, float* output, const int num_frames)
+float nam::Linear::process(float input, const int num_frames)
 {
   this->nam::Buffer::_update_buffers_(input, num_frames);
 
@@ -161,7 +181,9 @@ void nam::Linear::process(NAM_SAMPLE* input, NAM_SAMPLE* output, const int num_f
   {
     const size_t offset = this->_input_buffer_offset - this->_weight.size() + i + 1;
     auto input = Eigen::Map<const Eigen::VectorXf>(&this->_input_buffer[offset], this->_receptive_field);
-    output[i] = this->_bias + this->_weight.dot(input);
+    // Assuming 1 frame TODO KAB
+    return this->_bias + this->_weight.dot(input);
+    //output[i] = this->_bias + this->_weight.dot(input);
   }
 }
 

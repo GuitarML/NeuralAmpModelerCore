@@ -1,6 +1,6 @@
 #pragma once
 
-#include <filesystem>
+//#include <filesystem>
 #include <iterator>
 #include <memory>
 #include <string>
@@ -10,13 +10,13 @@
 #include <Eigen/Dense>
 
 #include "activations.h"
-#include "json.hpp"
+//#include "json.hpp"
 
-#ifdef NAM_SAMPLE_FLOAT
-  #define NAM_SAMPLE float
-#else
-  #define NAM_SAMPLE double
-#endif
+//#ifdef float_FLOAT
+//  #define float float
+//#else
+//  #define float float
+//#endif
 // Use a sample rate of -1 if we don't know what the model expects to be run at.
 // TODO clean this up and track a bool for whether it knows.
 #define NAM_UNKNOWN_EXPECTED_SAMPLE_RATE -1.0
@@ -40,8 +40,9 @@ public:
   // Older models won't know, but newer ones will come with a loudness from the training based on their response to a
   // standardized input.
   // We may choose to have the models figure out for themselves how loud they are in here in the future.
-  DSP(const double expected_sample_rate);
-  virtual ~DSP() = default;
+  DSP(const float expected_sample_rate);
+  //virtual ~DSP() = default;
+  ~DSP();
   // prewarm() does any required intial work required to "settle" model initial conditions
   // it can be somewhat expensive, so should not be called during realtime audio processing
   virtual void prewarm();
@@ -51,30 +52,31 @@ public:
   // 1. The core DSP algorithm is run (This is what should probably be
   //    overridden in subclasses).
   // 2. The output level is applied and the result stored to `output`.
-  virtual void process(NAM_SAMPLE* input, NAM_SAMPLE* output, const int num_frames);
+  //virtual void process(float* input, float* output, const int num_frames);
+  virtual float process(float input, const int num_frames);
   // Anything to take care of before next buffer comes in.
   // For example:
   // * Move the buffer index forward
   virtual void finalize_(const int num_frames);
   // Expected sample rate, in Hz.
   // TODO throw if it doesn't know.
-  double GetExpectedSampleRate() const { return mExpectedSampleRate; };
+  float GetExpectedSampleRate() const { return mExpectedSampleRate; };
   // Get how loud this model is, in dB.
   // Throws a std::runtime_error if the model doesn't know how loud it is.
-  double GetLoudness() const;
+  float GetLoudness() const;
   // Get whether the model knows how loud it is.
   bool HasLoudness() const { return mHasLoudness; };
   // Set the loudness, in dB.
   // This is usually defined to be the loudness to a standardized input. The trainer has its own, but you can always
   // use this to define it a different way if you like yours better.
-  void SetLoudness(const double loudness);
+  void SetLoudness(const float loudness);
 
 protected:
   bool mHasLoudness = false;
   // How loud is the model? In dB
-  double mLoudness = 0.0;
+  float mLoudness = 0.0;
   // What sample rate does the model expect?
-  double mExpectedSampleRate;
+  float mExpectedSampleRate;
   // How many samples should be processed during "pre-warming"
   int _prewarm_samples = 0;
 };
@@ -85,7 +87,7 @@ protected:
 class Buffer : public DSP
 {
 public:
-  Buffer(const int receptive_field, const double expected_sample_rate = -1.0);
+  Buffer(const int receptive_field, const float expected_sample_rate = -1.0);
   void finalize_(const int num_frames);
 
 protected:
@@ -101,7 +103,8 @@ protected:
   void _set_receptive_field(const int new_receptive_field);
   void _reset_input_buffer();
   // Use this->_input_post_gain
-  virtual void _update_buffers_(NAM_SAMPLE* input, int num_frames);
+  //virtual void _update_buffers_(float* input, int num_frames);
+  virtual void _update_buffers_(float input, int num_frames);
   virtual void _rewind_buffers_();
 };
 
@@ -110,8 +113,9 @@ class Linear : public Buffer
 {
 public:
   Linear(const int receptive_field, const bool _bias, const std::vector<float>& weights,
-         const double expected_sample_rate = -1.0);
-  void process(NAM_SAMPLE* input, NAM_SAMPLE* output, const int num_frames) override;
+         const float expected_sample_rate = -1.0);
+  //void process(float* input, float* output, const int num_frames) override;
+  float process(float input, const int num_frames) override;
 
 protected:
   Eigen::VectorXf _weight;
@@ -188,10 +192,10 @@ struct dspData
 {
   std::string version;
   std::string architecture;
-  nlohmann::json config;
-  nlohmann::json metadata;
+  //nlohmann::json config;
+  //nlohmann::json metadata;
   std::vector<float> weights;
-  double expected_sample_rate;
+  float expected_sample_rate;
 };
 
 // Verify that the config that we are building our model from is supported by
@@ -199,11 +203,11 @@ struct dspData
 void verify_config_version(const std::string version);
 
 // Takes the model file and uses it to instantiate an instance of DSP.
-std::unique_ptr<DSP> get_dsp(const std::filesystem::path model_file);
+//std::unique_ptr<DSP> get_dsp(const std::filesystem::path model_file);
 // Creates an instance of DSP. Also returns a dspData struct that holds the data of the model.
-std::unique_ptr<DSP> get_dsp(const std::filesystem::path model_file, dspData& returnedConfig);
+//std::unique_ptr<DSP> get_dsp(const std::filesystem::path model_file, dspData& returnedConfig);
 // Instantiates a DSP object from dsp_config struct.
 std::unique_ptr<DSP> get_dsp(dspData& conf);
 // Legacy loader for directory-type DSPs
-std::unique_ptr<DSP> get_dsp_legacy(const std::filesystem::path dirname);
+//std::unique_ptr<DSP> get_dsp_legacy(const std::filesystem::path dirname);
 }; // namespace nam
